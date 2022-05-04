@@ -1,11 +1,11 @@
 # israel train schedule
 print your train schedule in a terminal application.
 
-packages required:
+required packages:
 1. fzf
 2. jq
 
-run in directory the script `train` like this: 
+run in repo root dir the script `train` as follows: 
 ```
 ./train
 ```
