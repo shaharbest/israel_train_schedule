@@ -1,0 +1,21 @@
+#!/bin/sh
+
+STATIONS_IDS_FILE="/tmp/stations_ids.csv"
+URL="https://www.rail.co.il"
+WEBSITE_CONTENT="/tmp/israel_train_website.html"
+
+extract_stations_ids() {
+	grep stationSegRes $WEBSITE_CONTENT | \
+		sed -E 's#<script>var stationSegRes=(.*);(.*);</script>#\1#' | \
+		jq '.Data.Data.CustomPropertys[] | del(.Heb, .Rus, .Arb) | flatten | join(":")' | \
+		tr -d \"
+}
+
+download_webpage() {
+	curl $URL 2> /dev/null > $WEBSITE_CONTENT
+}
+
+[[ ! -f $WEBSITE_CONTENT ]] && download_webpage
+[[ ! -f $STATIONS_IDS_FILE ]] && extract_stations_ids > $STATIONS_IDS_FILE
+
+cat $STATIONS_IDS_FILE
