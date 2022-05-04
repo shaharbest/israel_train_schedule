@@ -19,7 +19,7 @@ fetch_all_hours_of_today() {
 		'/[{}]/d' \
 		"s@($D2/$D2/$D{4})@@g" \
 		"s@($D2:$D2):$D2@\1@g" \
-		's/,/ 👉 /g' \
+		's/,/ -> /g' \
 		's/(a:)|(b:)//g')
 
 	SED_CMD=$(IFS=';' ; echo "${foo[*]}")
@@ -36,7 +36,8 @@ terminal() {
 	HOUR=$(date +%H)
 	COUNT=5
 	TRAIN_RES_FILE="/tmp/train_res_for_$DATE.json"
-	[[ ! -f "$TRAIN_RES_FILE" ]] && fetch_all_hours_of_today $TRAIN_RES_FILE $1 $2
+	fetch_all_hours_of_today $TRAIN_RES_FILE $1 $2
+	# [[ ! -f "$TRAIN_RES_FILE" ]] && fetch_all_hours_of_today $TRAIN_RES_FILE $1 $2
 	HOUR_STRING="/(^$HOUR)/,\$p"
 	sed -En $HOUR_STRING $TRAIN_RES_FILE
 }
@@ -44,13 +45,9 @@ terminal() {
 terminal2() {
 	[[ -z $1 ]] && HOUR=$(date +%H) || HOUR=$1
 	[[ -z $2 ]] && COUNT=5 || COUNT=$2
-
 	TRAIN_RES_FILE="/tmp/train_res_for_$DATE.json"
-
 	[[ ! -f "$TRAIN_RES_FILE" ]] && fetch_all_hours_of_today $TRAIN_RES_FILE
-
 	HOUR_STRING="/(^$HOUR)/,\$p"
-
 	sed -En $HOUR_STRING $TRAIN_RES_FILE | \
 	head -n $COUNT | \
 	paint_even_rows yellow
