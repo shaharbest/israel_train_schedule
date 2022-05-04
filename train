@@ -1,0 +1,63 @@
+#!/bin/sh
+
+DATE=$(date +%Y%m%d)
+DOMAIN=https://www.rail.co.il
+
+fetch_all_hours_of_today() {
+		ROUTE=apiinfo/api/Plan/GetRoutes
+		PARAMS=OId\=4600\&TId\=2300\&Date\=$DATE\&Hour\=0000
+		URL=$DOMAIN/$ROUTE\?$PARAMS
+
+		boo=(\
+				'.Data.Routes[].Train[]' \
+				'{a: .DepartureTime, b: .ArrivalTime}')
+		JQ_CMD=$(IFS='|' ; echo "${boo[*]}")
+		D='[0-9]'
+		D2="$D{2}"
+		foo=(\
+				's/"| //g' \
+				'/[{}]/d' \
+				"s@($D2/$D2/$D{4})@@g" \
+				"s@($D2:$D2):$D2@\1@g" \
+				's/,/ 👉 /g' \
+				's/(a:)|(b:)//g')
+
+		SED_CMD=$(IFS=';' ; echo "${foo[*]}")
+		SED_BREAK_CMD="s/($D2:$D2)($D2:$D2)/\1\n\2/g"
+
+		curl $URL 2>/dev/null | \
+		jq "$JQ_CMD" | \
+		sed -Ee "$SED_CMD" | \
+		tr -d '\n' | \
+		sed -Ee $SED_BREAK_CMD > $1
+}
+
+terminal() {
+		[[ -z $1 ]] && HOUR=$(date +%H) || HOUR=$1
+		[[ -z $2 ]] && COUNT=5 || COUNT=$2
+
+		TRAIN_RES_FILE="/tmp/train_res_for_$DATE.json"
+
+		[[ ! -f "$TRAIN_RES_FILE" ]] && \
+				fetch_all_hours_of_today $TRAIN_RES_FILE
+
+		HOUR_STRING="/(^$HOUR)/,\$p"
+
+		sed -En $HOUR_STRING $TRAIN_RES_FILE | \
+		head -n $COUNT | \
+		paint_even_rows yellow
+}
+
+browser() { 
+		[[ -z $1 ]] && HOUR=$(date +%H) || HOUR=$1
+
+		ROUTE=pages/trainsearchresultnew.aspx
+		REST_PARAMS="FSID=4600&TSID=2300&IOT=true&IBA=false&TSP=1641991135678"
+		TIME_PARAMS="Date=${DATE}&Hour=${HOUR}00"
+		PARAMS="${REST_PARAMS}&${TIME_PARAMS}"
+		URL="${DOMAIN}/${ROUTE}?${PARAMS}"
+
+		open $URL
+}
+
+[[ $1 = 'b' ]] && browser $2 || terminal $1 $2
