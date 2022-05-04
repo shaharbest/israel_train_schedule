@@ -4,60 +4,97 @@ DATE=$(date +%Y%m%d)
 DOMAIN=https://www.rail.co.il
 
 fetch_all_hours_of_today() {
-		ROUTE=apiinfo/api/Plan/GetRoutes
-		PARAMS=OId\=4600\&TId\=2300\&Date\=$DATE\&Hour\=0000
-		URL=$DOMAIN/$ROUTE\?$PARAMS
+	ROUTE=apiinfo/api/Plan/GetRoutes
+	PARAMS=OId\=$2\&TId\=$3\&Date\=$DATE\&Hour\=0000
+	URL=$DOMAIN/$ROUTE\?$PARAMS
 
-		boo=(\
-				'.Data.Routes[].Train[]' \
-				'{a: .DepartureTime, b: .ArrivalTime}')
-		JQ_CMD=$(IFS='|' ; echo "${boo[*]}")
-		D='[0-9]'
-		D2="$D{2}"
-		foo=(\
-				's/"| //g' \
-				'/[{}]/d' \
-				"s@($D2/$D2/$D{4})@@g" \
-				"s@($D2:$D2):$D2@\1@g" \
-				's/,/ 👉 /g' \
-				's/(a:)|(b:)//g')
+	boo=(\
+		'.Data.Routes[].Train[]' \
+		'{a: .DepartureTime, b: .ArrivalTime}')
+	JQ_CMD=$(IFS='|' ; echo "${boo[*]}")
+	D='[0-9]'
+	D2="$D{2}"
+	foo=(\
+		's/"| //g' \
+		'/[{}]/d' \
+		"s@($D2/$D2/$D{4})@@g" \
+		"s@($D2:$D2):$D2@\1@g" \
+		's/,/ 👉 /g' \
+		's/(a:)|(b:)//g')
 
-		SED_CMD=$(IFS=';' ; echo "${foo[*]}")
-		SED_BREAK_CMD="s/($D2:$D2)($D2:$D2)/\1\n\2/g"
+	SED_CMD=$(IFS=';' ; echo "${foo[*]}")
+	SED_BREAK_CMD="s/($D2:$D2)($D2:$D2)/\1\n\2/g"
 
-		curl $URL 2>/dev/null | \
-		jq "$JQ_CMD" | \
-		sed -Ee "$SED_CMD" | \
-		tr -d '\n' | \
-		sed -Ee $SED_BREAK_CMD > $1
+	curl $URL 2>/dev/null | \
+	jq "$JQ_CMD" | \
+	sed -Ee "$SED_CMD" | \
+	tr -d '\n' | \
+	sed -Ee $SED_BREAK_CMD > $1
 }
 
 terminal() {
-		[[ -z $1 ]] && HOUR=$(date +%H) || HOUR=$1
-		[[ -z $2 ]] && COUNT=5 || COUNT=$2
-
-		TRAIN_RES_FILE="/tmp/train_res_for_$DATE.json"
-
-		[[ ! -f "$TRAIN_RES_FILE" ]] && \
-				fetch_all_hours_of_today $TRAIN_RES_FILE
-
-		HOUR_STRING="/(^$HOUR)/,\$p"
-
-		sed -En $HOUR_STRING $TRAIN_RES_FILE | \
-		head -n $COUNT | \
-		paint_even_rows yellow
+	HOUR=$(date +%H)
+	COUNT=5
+	TRAIN_RES_FILE="/tmp/train_res_for_$DATE.json"
+	[[ ! -f "$TRAIN_RES_FILE" ]] && fetch_all_hours_of_today $TRAIN_RES_FILE $1 $2
+	HOUR_STRING="/(^$HOUR)/,\$p"
+	sed -En $HOUR_STRING $TRAIN_RES_FILE
 }
 
-browser() { 
-		[[ -z $1 ]] && HOUR=$(date +%H) || HOUR=$1
+terminal2() {
+	[[ -z $1 ]] && HOUR=$(date +%H) || HOUR=$1
+	[[ -z $2 ]] && COUNT=5 || COUNT=$2
 
-		ROUTE=pages/trainsearchresultnew.aspx
-		REST_PARAMS="FSID=4600&TSID=2300&IOT=true&IBA=false&TSP=1641991135678"
-		TIME_PARAMS="Date=${DATE}&Hour=${HOUR}00"
-		PARAMS="${REST_PARAMS}&${TIME_PARAMS}"
-		URL="${DOMAIN}/${ROUTE}?${PARAMS}"
+	TRAIN_RES_FILE="/tmp/train_res_for_$DATE.json"
 
-		open $URL
+	[[ ! -f "$TRAIN_RES_FILE" ]] && fetch_all_hours_of_today $TRAIN_RES_FILE
+
+	HOUR_STRING="/(^$HOUR)/,\$p"
+
+	sed -En $HOUR_STRING $TRAIN_RES_FILE | \
+	head -n $COUNT | \
+	paint_even_rows yellow
 }
 
-[[ $1 = 'b' ]] && browser $2 || terminal $1 $2
+browser() {
+	HOUR=$(date +%H)
+
+	ROUTE=pages/trainsearchresultnew.aspx
+	REST_PARAMS="FSID=$1&TSID=$2&IOT=true&IBA=false&TSP=1641991135678"
+	TIME_PARAMS="Date=${DATE}&Hour=${HOUR}00"
+	PARAMS="${REST_PARAMS}&${TIME_PARAMS}"
+	URL="${DOMAIN}/${ROUTE}?${PARAMS}"
+
+	open $URL
+}
+
+browser2() {
+	[[ -z $1 ]] && HOUR=$(date +%H) || HOUR=$1
+
+	ROUTE=pages/trainsearchresultnew.aspx
+	REST_PARAMS="FSID=$1&TSID=$2&IOT=true&IBA=false&TSP=1641991135678"
+	TIME_PARAMS="Date=${DATE}&Hour=${HOUR}00"
+	PARAMS="${REST_PARAMS}&${TIME_PARAMS}"
+	URL="${DOMAIN}/${ROUTE}?${PARAMS}"
+
+	open $URL
+}
+
+input_station() {
+	./stations | sed -E 's/.*:(.*)$/\1/' | sort | fzf --header="$1"
+}
+
+extract_station_id() {
+	./stations | grep $1 | sed -E 's/:.*//g'
+}
+
+ENTER_STATION=$(input_station "choose enter station")
+EXIT_STATION=$(input_station "choose exit station")
+
+ENTER_STATION_ID=$(extract_station_id $ENTER_STATION)
+EXIT_STATION_ID=$(extract_station_id $EXIT_STATION)
+
+echo "enter: $ENTER_STATION exit: $EXIT_STATION"
+
+[[ $1 = 'b' ]] && browser $ENTER_STATION_ID $EXIT_STATION_ID || \
+	terminal $ENTER_STATION_ID $EXIT_STATION_ID
