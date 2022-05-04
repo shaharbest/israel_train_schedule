@@ -1,4 +1,11 @@
-# israel_train_schedule
-Israel train schedule in terminal application
+# israel train schedule
+print your train schedule in a terminal application.
 
-packages required: fzf, jq
+packages required:
+1. fzf
+2. jq
+
+run in directory the script `train` like this: 
+```
+./train
+```
